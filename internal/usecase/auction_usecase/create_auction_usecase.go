@@ -39,8 +39,8 @@ func NewAuctionUseCase(
 	auctionRepositoryInterface auction_entity.AuctionRepositoryInterface,
 	bidRepositoryInterface bid_entity.BidEntityRepository) AuctionUseCaseInterface {
 
-	batchInsertInterval := os.Getenv("AUCTION_INTERVAL")
-	duration, err := time.ParseDuration(batchInsertInterval)
+	auctionDuration := os.Getenv("AUCTION_INTERVAL")
+	duration, err := time.ParseDuration(auctionDuration)
 	if err != nil {
 		duration = 20 * time.Second
 	}
@@ -74,12 +74,22 @@ type AuctionUseCaseInterface interface {
 type ProductCondition int64
 type AuctionStatus int64
 
-type AuctionUseCase struct {
-	auctionRepositoryInterface auction_entity.AuctionRepositoryInterface
-	bidRepositoryInterface     bid_entity.BidEntityRepository
-	auctionCloseChannel        chan auction_entity.Auction
-	auctionDuration            time.Duration
-}
+type (
+	auctionRepositoryInterface interface {
+		auction_entity.AuctionRepositoryInterface
+	}
+
+	bidRepositoryInterface interface {
+		bid_entity.BidEntityRepository
+	}
+
+	AuctionUseCase struct {
+		auctionRepositoryInterface auctionRepositoryInterface
+		bidRepositoryInterface     bidRepositoryInterface
+		auctionCloseChannel        chan auction_entity.Auction
+		auctionDuration            time.Duration
+	}
+)
 
 func (au *AuctionUseCase) CreateAuction(
 	ctx context.Context,
