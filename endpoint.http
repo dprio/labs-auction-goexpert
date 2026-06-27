@@ -1,0 +1,15 @@
+### Criando Auction
+POST http://localhost:8080/auction
+Content-Type: application/json
+
+{
+    "product_name": "Agora foi",
+    "category": "Eletrônicos",
+    "description": "Descrição do produto",
+    "condition": 0
+}
+
+
+### Listando Auctions
+GET http://localhost:8080/auction?status=0
+

@@ -3,8 +3,9 @@ package auction_entity
 import (
 	"context"
 	"fullcycle-auction_go/internal/internal_error"
-	"github.com/google/uuid"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 func CreateAuction(
@@ -63,8 +64,21 @@ const (
 	Refurbished
 )
 
+func (a *Auction) Close() *internal_error.InternalError {
+	if a.Status == Completed {
+		return internal_error.NewBadRequestError("auction already compledted")
+	}
+
+	a.Status = Completed
+	return nil
+}
+
 type AuctionRepositoryInterface interface {
 	CreateAuction(
+		ctx context.Context,
+		auctionEntity *Auction) *internal_error.InternalError
+
+	UpdateAuction(
 		ctx context.Context,
 		auctionEntity *Auction) *internal_error.InternalError
 

@@ -21,6 +21,7 @@ func init() {
 			EncodeTime:   zapcore.ISO8601TimeEncoder,
 			EncodeCaller: zapcore.ShortCallerEncoder,
 		},
+		OutputPaths: []string{"stdout"},
 	}
 
 	log, _ = logConfiguration.Build()
