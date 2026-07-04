@@ -2,11 +2,15 @@ package auction_usecase
 
 import (
 	"context"
+	"fullcycle-auction_go/configuration/logger"
 	"fullcycle-auction_go/internal/entity/auction_entity"
 	"fullcycle-auction_go/internal/entity/bid_entity"
 	"fullcycle-auction_go/internal/internal_error"
 	"fullcycle-auction_go/internal/usecase/bid_usecase"
+	"os"
 	"time"
+
+	"go.uber.org/zap"
 )
 
 type AuctionInputDTO struct {
@@ -34,9 +38,18 @@ type WinningInfoOutputDTO struct {
 func NewAuctionUseCase(
 	auctionRepositoryInterface auction_entity.AuctionRepositoryInterface,
 	bidRepositoryInterface bid_entity.BidEntityRepository) AuctionUseCaseInterface {
+
+	auctionDuration := os.Getenv("AUCTION_INTERVAL")
+	duration, err := time.ParseDuration(auctionDuration)
+	if err != nil {
+		duration = 20 * time.Second
+	}
+
 	return &AuctionUseCase{
 		auctionRepositoryInterface: auctionRepositoryInterface,
 		bidRepositoryInterface:     bidRepositoryInterface,
+		auctionCloseChannel:        make(chan auction_entity.Auction, 100),
+		auctionDuration:            duration,
 	}
 }
 
@@ -61,14 +74,28 @@ type AuctionUseCaseInterface interface {
 type ProductCondition int64
 type AuctionStatus int64
 
-type AuctionUseCase struct {
-	auctionRepositoryInterface auction_entity.AuctionRepositoryInterface
-	bidRepositoryInterface     bid_entity.BidEntityRepository
-}
+type (
+	auctionRepositoryInterface interface {
+		auction_entity.AuctionRepositoryInterface
+	}
+
+	bidRepositoryInterface interface {
+		bid_entity.BidEntityRepository
+	}
+
+	AuctionUseCase struct {
+		auctionRepositoryInterface auctionRepositoryInterface
+		bidRepositoryInterface     bidRepositoryInterface
+		auctionCloseChannel        chan auction_entity.Auction
+		auctionDuration            time.Duration
+	}
+)
 
 func (au *AuctionUseCase) CreateAuction(
 	ctx context.Context,
 	auctionInput AuctionInputDTO) *internal_error.InternalError {
+
+	logger.Info("Creating auction with input: ", zap.Any("auctionInput", auctionInput))
 	auction, err := auction_entity.CreateAuction(
 		auctionInput.ProductName,
 		auctionInput.Category,
@@ -82,6 +109,18 @@ func (au *AuctionUseCase) CreateAuction(
 		ctx, auction); err != nil {
 		return err
 	}
+
+	go func(auc *auction_entity.Auction) {
+		logger.Info("auction close scheduled", zap.String("auction", auc.Id))
+		for range time.After(au.auctionDuration) {
+			logger.Info("closing auction", zap.String("auction", auc.Id))
+			auc.Close()
+			if err := au.auctionRepositoryInterface.UpdateAuction(ctx, auc); err != nil {
+				logger.Error("Error trying to update auction", err)
+			}
+		}
+
+	}(auction)
 
 	return nil
 }
